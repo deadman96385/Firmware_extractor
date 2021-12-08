@@ -13,7 +13,7 @@
 # ZTE update.zip
 # KDDI .bin
 # bin images
-# pac
+# Unisoc/SPRD pac files
 # sign images
 # sign auth DA images
 # nb0
@@ -90,10 +90,11 @@ kdz_extract="$toolsdir/kdztools/unkdz.py"
 dz_extract="$toolsdir/kdztools/undz.py"
 ruu="$toolsdir/$HOST/bin/RUU_Decrypt_Tool"
 aml_extract="$toolsdir/aml-upgrade-package-extract"
+pac_extract="$toolsdir/pacextractor"
 
 romzip="$(realpath $1)"
 romzipext="${romzip##*.}"
-PARTITIONS="super system vendor cust odm oem factory product xrom modem dtbo dtb boot recovery tz systemex oppo_product preload_common system_ext system_other opproduct reserve india my_preload my_odm my_stock my_operator my_country my_product my_company my_engineering my_heytap"
+PARTITIONS="uboot super system vendor cust odm oem factory product xrom modem dtbo dtb boot recovery tz systemex oppo_product preload_common system_ext system_other opproduct reserve india my_preload my_odm my_stock my_operator my_country my_product my_company my_engineering my_heytap"
 EXT4PARTITIONS="system vendor cust odm oem factory product xrom systemex oppo_product preload_common"
 OTHERPARTITIONS="tz.mbn:tz tz.img:tz modem.img:modem NON-HLOS:modem boot-verified.img:boot dtbo-verified.img:dtbo"
 
@@ -167,7 +168,27 @@ if [[ $(7z l -ba "$romzip" | grep -i aml) ]]; then
     exit 0
 fi
 
-if [[ ! $(7z l -ba "$romzip" | grep ".*system.ext4.tar.*\|.*.tar\|.*chunk\|system\/build.prop\|system.new.dat\|system_new.img\|system.img\|system-sign.img\|system.bin\|payload.bin\|.*.zip\|.*.rar\|.*rawprogram*\|system.sin\|.*system_.*\.sin\|system-p\|super\|UPDATE.APP\|.*.pac\|.*.nb0" | grep -v ".*chunk.*\.so$") ]]; then
+if [[ $(7z l -ba "$romzip" | grep -i pac) ]]; then
+    echo "pac detected"
+    cp "$romzip" $tmpdir
+    romzip="$tmpdir/$(basename $romzip)"
+    7z e -y "$romzip" >> $tmpdir/zip.log
+    $pac_extract -f $(find . -type f -name "*.pac") -o $tmpdir/
+    rename 's/u-boot-sign.bin$/uboot.img/' *.img
+    rename 's/super_gsi64.img$/super.img/' *.img
+	#ls -al $tmpdir/
+	#cp $tmpdir/zip.log $outdir/
+    if [[ -f super.img ]]; then
+        superimage
+    fi
+    for partition in $PARTITIONS; do
+        [[ -e "$tmpdir/$partition.img" ]] && mv "$tmpdir/$partition.img" "$outdir/$partition.img"
+    done
+    rm -rf $tmpdir
+    exit 0
+fi
+
+if [[ ! $(7z l -ba "$romzip" | grep ".*system.ext4.tar.*\|.*.tar\|.*chunk\|system\/build.prop\|system.new.dat\|system_new.img\|system.img\|system-sign.img\|system.bin\|payload.bin\|.*.zip\|.*.rar\|.*rawprogram*\|system.sin\|.*system_.*\.sin\|system-p\|super\|UPDATE.APP\|.*.gz\|.*.pac\|.*.nb0" | grep -v ".*chunk.*\.so$") ]]; then
     echo "BRUH: This type of firmwares not supported"
     cd "$LOCALDIR"
     rm -rf "$tmpdir" "$outdir"
